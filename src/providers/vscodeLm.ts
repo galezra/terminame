@@ -18,6 +18,7 @@ export class VscodeLmProvider implements NameProvider {
   async name(req: NameRequest, signal: AbortSignal): Promise<string | null> {
     if (!this.model) return null;
     const cts = new vscode.CancellationTokenSource();
+    if (signal.aborted) { cts.dispose(); return null; }
     const onAbort = () => cts.cancel();
     signal.addEventListener("abort", onAbort, { once: true });
     try {

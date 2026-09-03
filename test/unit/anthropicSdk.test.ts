@@ -34,4 +34,11 @@ describe("AnthropicSdkProvider", () => {
     expect(params.system).toContain("You name terminal tabs");
     expect(params.messages[0].content).toContain("Folder: web");
   });
+  it("treats a refusal stop reason as a miss", async () => {
+    const client = fakeClient({ text: "Should Not Be Used" });
+    client.messages.create = async () => ({ content: [{ type: "text", text: "Should Not Be Used" }], stop_reason: "refusal" } as never);
+    const p = new AnthropicSdkProvider({ getApiKey: async () => "k", getModel: () => "claude-haiku-4-5", createClient: () => client });
+    expect(await p.isAvailable()).toBe(true);
+    expect(await p.name({ command: "rm -rf /" }, new AbortController().signal)).toBeNull();
+  });
 });
