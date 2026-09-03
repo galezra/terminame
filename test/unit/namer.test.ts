@@ -90,4 +90,28 @@ describe("Namer.name", () => {
     const n = new Namer([], new NameCache(store()), base()); await n.init();
     expect(await n.name({ command: "terraform plan" }, new AbortController().signal)).toEqual({ name: "Terraform", source: "rules" });
   });
+  it("re-selects the provider when updateOptions changes forced", async () => {
+    const p = fake("claudeCli", { answer: "Model" });
+    const n = new Namer([p], new NameCache(store()), base()); await n.init();
+    expect(n.activeId).toBe("claudeCli");
+    await n.updateOptions({ forced: "rules" });
+    expect(n.activeId).toBe("rules");
+    expect(await n.name({ command: "terraform plan" }, new AbortController().signal)).toEqual({ name: "Terraform", source: "rules" });
+    await n.updateOptions({ timeoutMs: 10 }); // unrelated option: no re-init
+    expect(n.activeId).toBe("rules");
+  });
+  it("enforces the timeout even when the provider ignores the signal", async () => {
+    const deaf: NameProvider & { calls: number } = {
+      id: "claudeCli", calls: 0,
+      isAvailable: async () => true,
+      name: () => new Promise((resolve) => setTimeout(() => resolve("Late"), 400)), // ignores signal
+    };
+    const cache = new NameCache(store());
+    const n = new Namer([deaf], cache, base({ timeoutMs: 20 })); await n.init();
+    const started = Date.now();
+    const result = await n.name({ command: "npm run dev" }, new AbortController().signal);
+    expect(Date.now() - started).toBeLessThan(300);
+    expect(result).toEqual({ name: "Start App", source: "rules" });
+    expect(cache.get("npm run dev")).toBeUndefined();
+  });
 });

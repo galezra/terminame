@@ -22,7 +22,11 @@ export class Namer {
 
   get activeId(): ProviderId | "rules" { return this.active?.id ?? "rules"; }
 
-  updateOptions(opts: Partial<NamerOptions>): void { this.opts = { ...this.opts, ...opts }; }
+  async updateOptions(opts: Partial<NamerOptions>): Promise<void> {
+    const forcedChanged = opts.forced !== undefined && opts.forced !== this.opts.forced;
+    this.opts = { ...this.opts, ...opts };
+    if (forcedChanged) await this.init();
+  }
 
   rulesName(command: string): string { return ruleName(command, this.opts.userRules); }
 
@@ -58,7 +62,14 @@ export class Namer {
     const combined = AbortSignal.any([signal, AbortSignal.timeout(this.opts.timeoutMs)]);
     let raw: string | null = null;
     try {
-      raw = await provider.name(req, combined);
+      raw = await new Promise<string | null>((resolve, reject) => {
+        const onAbort = () => reject(new Error("aborted"));
+        if (combined.aborted) { onAbort(); return; }
+        combined.addEventListener("abort", onAbort, { once: true });
+        provider.name(req, combined)
+          .then(resolve, reject)
+          .finally(() => combined.removeEventListener("abort", onAbort));
+      });
     } catch (e) {
       if (signal.aborted) return null;
       this.opts.log(`provider ${provider.id} error: ${String(e)}`);
