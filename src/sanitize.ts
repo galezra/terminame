@@ -6,6 +6,7 @@ export function sanitizeName(raw: string): string | null {
   s = s.replace(/^["'`*#\-\s]+/, "").replace(/["'`*.!?:;,\s]+$/, "");
   s = s.replace(/\s+/g, " ").trim();
   if (!s) return null;
+  if (!/[\p{L}\p{N}]/u.test(s)) return null;
   const words = s.split(" ").slice(0, MAX_WORDS).map((w) => (w === w.toLowerCase() ? w[0].toUpperCase() + w.slice(1) : w));
   s = words.join(" ");
   if (s.length > MAX_CHARS) s = s.slice(0, MAX_CHARS).trimEnd();

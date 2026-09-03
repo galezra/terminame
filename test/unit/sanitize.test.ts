@@ -17,5 +17,7 @@ describe("sanitizeName", () => {
   it("returns null for empty or whitespace", () => {
     expect(sanitizeName("   ")).toBeNull();
     expect(sanitizeName('""')).toBeNull();
+    expect(sanitizeName("()")).toBeNull();
+    expect(sanitizeName("---")).toBeNull();
   });
 });
