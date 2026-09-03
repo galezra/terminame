@@ -1,0 +1,147 @@
+{
+  "name": "terminame",
+  "displayName": "Terminame",
+  "description": "Auto-names terminal tabs from the command running in them",
+  "version": "0.1.0",
+  "publisher": "gal-ezra",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.93.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "terminame.renameNow",
+        "title": "Terminame: Rename current terminal now"
+      },
+      {
+        "command": "terminame.clearCache",
+        "title": "Terminame: Clear name cache"
+      },
+      {
+        "command": "terminame.showLog",
+        "title": "Terminame: Show log"
+      },
+      {
+        "command": "terminame.setAnthropicApiKey",
+        "title": "Terminame: Set Anthropic API key"
+      }
+    ],
+    "configuration": {
+      "title": "Terminame",
+      "properties": {
+        "terminame.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Master switch."
+        },
+        "terminame.mode": {
+          "type": "string",
+          "enum": [
+            "waitForModel",
+            "instant"
+          ],
+          "default": "waitForModel",
+          "description": "waitForModel: rename once the model answers. instant: rename from rules first, then refine."
+        },
+        "terminame.timeoutMs": {
+          "type": "number",
+          "default": 6000,
+          "minimum": 500,
+          "description": "Model call timeout in milliseconds."
+        },
+        "terminame.provider": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "vscodeLm",
+            "claudeCli",
+            "anthropic",
+            "rules"
+          ],
+          "default": "auto",
+          "description": "Force a naming provider, or auto-detect."
+        },
+        "terminame.anthropic.model": {
+          "type": "string",
+          "default": "claude-haiku-4-5",
+          "description": "Model for the Anthropic SDK provider."
+        },
+        "terminame.rules": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "object",
+            "required": [
+              "match",
+              "name"
+            ],
+            "properties": {
+              "match": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          },
+          "description": "User rules checked before built-ins. `match` is a prefix pattern; `*` matches anything, `<word>` captures one word and can be reused in `name`."
+        },
+        "terminame.ignore": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Extra first-words that never trigger a rename."
+        },
+        "terminame.idleName": {
+          "type": "string",
+          "enum": [
+            "keep",
+            "folder",
+            "shell"
+          ],
+          "default": "keep",
+          "description": "Tab name after the command ends."
+        },
+        "terminame.aggressiveRename": {
+          "type": "boolean",
+          "default": false,
+          "description": "Briefly focus background terminals to rename them immediately (causes a flicker)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "compile-tests": "tsc -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:ext": "npm run build && npm run compile-tests && vscode-test",
+    "package": "vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20.19.43",
+    "@types/vscode": "1.93",
+    "@vscode/test-cli": "^0.0.15",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^3.9.2",
+    "esbuild": "^0.28.2",
+    "mocha": "^12.0.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.123.0"
+  }
+}
