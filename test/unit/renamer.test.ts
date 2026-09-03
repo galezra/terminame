@@ -63,4 +63,11 @@ describe("Renamer", () => {
     await r.setName(b, "Tests"); r.forget(b); await r.onActiveChanged(b);
     expect(h.names.get("b")).toBeUndefined();
   });
+  it("aggressive mode restores focus even when rename fails", async () => {
+    const act = { t: a }; const h = host(act); const r = new Renamer(h, { aggressive: true });
+    h.rename = async () => { throw new Error("rename failed"); };
+    await expect(r.setName(b, "Tests")).rejects.toThrow("rename failed");
+    expect(h.focused).toEqual(["b", "a"]);
+    expect(act.t).toBe(a);
+  });
 });

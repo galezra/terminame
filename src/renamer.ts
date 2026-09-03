@@ -49,8 +49,11 @@ export class Renamer<T extends object> {
     if (this.opts.aggressive) {
       const previous = this.host.activeTerminal();
       this.host.focus(t);
-      await this.apply(t, s, name);
-      if (previous) this.host.focus(previous);
+      try {
+        await this.apply(t, s, name);
+      } finally {
+        if (previous) this.host.focus(previous);
+      }
       return;
     }
     s.pending = name;
