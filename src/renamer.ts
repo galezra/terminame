@@ -81,4 +81,12 @@ export class Renamer<T extends object> {
   }
 
   forget(t: T): void { this.state.delete(t); }
+
+  /** Hand control back to the extension for a terminal the user had renamed, keeping its original name. */
+  release(t: T): void {
+    const s = this.state.get(t);
+    // Clear `applied` too: otherwise detectUserRename compares the terminal's still-unchanged
+    // (user-set) name against the stale `applied` value and immediately re-flags it as user-owned.
+    if (s) { s.userOwned = false; s.pending = undefined; s.applied = undefined; }
+  }
 }

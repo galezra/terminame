@@ -34,10 +34,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     log: (m) => log.appendLine(`[${new Date().toISOString()}] ${m}`),
   });
 
+  const guarded = (label: string, p: Promise<unknown>): void => {
+    p.catch((e) => log.appendLine(`${label} failed: ${String(e)}`));
+  };
+
   const host: RenamerHost<vscode.Terminal> = {
     activeTerminal: () => vscode.window.activeTerminal,
     currentName: (t) => t.name,
-    rename: async (_t, name) => { await vscode.commands.executeCommand("workbench.action.terminal.renameWithArg", { name }); },
+    rename: async (t, name) => {
+      try {
+        await vscode.commands.executeCommand("workbench.action.terminal.renameWithArg", { name });
+      } catch (e) {
+        log.appendLine(`rename of "${t.name}" failed: ${String(e)}`);
+        throw e;
+      }
+    },
     focus: (t) => t.show(true),
   };
   const renamer = new Renamer<vscode.Terminal>(host, { aggressive: config.aggressiveRename });
@@ -57,6 +68,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const inflight = new WeakMap<vscode.Terminal, AbortController>();
   const seenExecution = new WeakSet<vscode.Terminal>();
+  const hintTimers = new Map<vscode.Terminal, NodeJS.Timeout>();
 
   async function handleStart(terminal: vscode.Terminal, commandLine: string, cwdBasename?: string): Promise<void> {
     seenExecution.add(terminal);
@@ -68,11 +80,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const ac = new AbortController();
     inflight.set(terminal, ac);
 
-    if (config.mode === "instant" && namer.activeId !== "rules") {
+    if (config.mode === "instant" && namer.activeId !== "rules" && cache.get(command) === undefined) {
       await renamer.setName(terminal, namer.rulesName(command));
     }
     const result = await namer.name({ command, cwdBasename }, ac.signal);
     if (!result || ac.signal.aborted) return;
+    if (inflight.get(terminal) !== ac) return;
     log.appendLine(`"${command}" → "${result.name}" (${result.source})`);
     await renamer.setName(terminal, result.name);
     refreshStatus();
@@ -80,21 +93,36 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   context.subscriptions.push(
     watchShell({
-      onStart: (e) => { void handleStart(e.terminal, e.commandLine, e.cwdBasename); },
-      onEnd: (e) => { void renamer.onCommandEnd(e.terminal, config.idleName, e.cwdBasename); },
+      onStart: (e) => { guarded("handleStart", handleStart(e.terminal, e.commandLine, e.cwdBasename)); },
+      onEnd: (e) => {
+        if (!config.enabled) return;
+        guarded("onCommandEnd", renamer.onCommandEnd(e.terminal, config.idleName, e.cwdBasename));
+      },
     }),
-    vscode.window.onDidChangeActiveTerminal((t) => { void renamer.onActiveChanged(t); }),
-    vscode.window.onDidCloseTerminal((t) => { inflight.get(t)?.abort(); inflight.delete(t); renamer.forget(t); }),
+    vscode.window.onDidChangeActiveTerminal((t) => {
+      if (!config.enabled) return;
+      guarded("onActiveChanged", renamer.onActiveChanged(t));
+    }),
+    vscode.window.onDidCloseTerminal((t) => {
+      inflight.get(t)?.abort();
+      inflight.delete(t);
+      renamer.forget(t);
+      const timer = hintTimers.get(t);
+      if (timer) { clearTimeout(timer); hintTimers.delete(t); }
+    }),
     vscode.window.onDidOpenTerminal((t) => {
       // Shell-integration hint: if the first command never produces an execution event, tell the user once.
-      setTimeout(() => {
+      const timer = setTimeout(() => {
+        hintTimers.delete(t);
         if (t.shellIntegration || seenExecution.has(t) || context.globalState.get(HINT_SHOWN_KEY)) return;
-        void context.globalState.update(HINT_SHOWN_KEY, true);
+        guarded("hint globalState.update", Promise.resolve(context.globalState.update(HINT_SHOWN_KEY, true)));
         void vscode.window.showInformationMessage(
           "Terminame needs terminal shell integration to see commands. Check that `terminal.integrated.shellIntegration.enabled` is on.",
         );
       }, 15000);
+      hintTimers.set(t, timer);
     }),
+    { dispose: () => { for (const h of hintTimers.values()) clearTimeout(h); hintTimers.clear(); } },
     vscode.workspace.onDidChangeConfiguration(async (e) => {
       if (!e.affectsConfiguration("terminame")) return;
       const previous: TerminameConfig = config;
@@ -111,8 +139,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (!t) return;
       const picked = await vscode.window.showInputBox({ prompt: "Command to name this terminal after", value: "" });
       if (picked === undefined) return;
-      renamer.forget(t);
-      await handleStart(t, picked);
+      renamer.release(t);
+      guarded("handleStart", handleStart(t, picked));
     }),
     vscode.commands.registerCommand("terminame.clearCache", async () => { await cache.clear(); log.appendLine("cache cleared"); }),
     vscode.commands.registerCommand("terminame.showLog", () => log.show()),

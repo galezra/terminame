@@ -70,4 +70,17 @@ describe("Renamer", () => {
     expect(h.focused).toEqual(["b", "a"]);
     expect(act.t).toBe(a);
   });
+  it("release clears user ownership but keeps the original name", async () => {
+    const h = host({ t: a }); const r = new Renamer(h, { aggressive: false });
+    await r.setName(a, "Start App");
+    h.names.set("a", "mine");
+    await r.setName(a, "Tests");            // flags user-owned
+    expect(r.isUserOwned(a)).toBe(true);
+    r.release(a);
+    expect(r.isUserOwned(a)).toBe(false);
+    await r.setName(a, "Tests");
+    expect(h.names.get("a")).toBe("Tests");
+    await r.onCommandEnd(a, "shell");
+    expect(h.names.get("a")).toBe("zsh");   // original preserved through release
+  });
 });
