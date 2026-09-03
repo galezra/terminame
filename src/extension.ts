@@ -57,7 +57,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   status.command = "terminame.showLog";
   context.subscriptions.push(status);
   const refreshStatus = () => {
-    if (namer.activeId === "rules") {
+    // Only nag when auto-detection landed on rules; `provider: "rules"` is a deliberate choice.
+    if (namer.activeId === "rules" && config.provider !== "rules") {
       status.text = "$(terminal) Terminame: rules";
       status.tooltip = "Terminame is naming tabs with built-in rules. Install Claude Code (and run /login) or sign in to Copilot for smarter names.";
       status.show();
@@ -80,7 +81,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const ac = new AbortController();
     inflight.set(terminal, ac);
 
-    if (config.mode === "instant" && namer.activeId !== "rules" && cache.get(command) === undefined) {
+    if (config.mode === "instant" && namer.activeId !== "rules" && cache.get(Namer.cacheKey({ command, cwdBasename })) === undefined) {
       await renamer.setName(terminal, namer.rulesName(command));
     }
     const result = await namer.name({ command, cwdBasename }, ac.signal);
@@ -96,6 +97,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       onStart: (e) => { guarded("handleStart", handleStart(e.terminal, e.commandLine, e.cwdBasename)); },
       onEnd: (e) => {
         if (!config.enabled) return;
+        // An ignored command never renamed anything, so it must not trigger the idle name either.
+        if (isIgnored(normalizeCommand(e.commandLine), config.ignore)) return;
+        if (!renamer.hasApplied(e.terminal)) return;
+        if (config.idleName !== "keep") {
+          // Drop any in-flight model call: a late answer must not overwrite the idle name.
+          const ac = inflight.get(e.terminal);
+          if (ac) { ac.abort(); inflight.delete(e.terminal); }
+        }
         guarded("onCommandEnd", renamer.onCommandEnd(e.terminal, config.idleName, e.cwdBasename));
       },
     }),
@@ -111,6 +120,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (timer) { clearTimeout(timer); hintTimers.delete(t); }
     }),
     vscode.window.onDidOpenTerminal((t) => {
+      // Extension-owned pty terminals never get shell integration by design; only real shells earn the hint.
+      if ("pty" in t.creationOptions) return;
       // Shell-integration hint: if the first command never produces an execution event, tell the user once.
       const timer = setTimeout(() => {
         hintTimers.delete(t);
@@ -123,16 +134,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       hintTimers.set(t, timer);
     }),
     { dispose: () => { for (const h of hintTimers.values()) clearTimeout(h); hintTimers.clear(); } },
-    vscode.workspace.onDidChangeConfiguration(async (e) => {
+    vscode.workspace.onDidChangeConfiguration((e) => {
       if (!e.affectsConfiguration("terminame")) return;
-      const previous: TerminameConfig = config;
-      config = readConfig();
-      await namer.updateOptions({ timeoutMs: config.timeoutMs, userRules: config.rules, forced: config.provider });
-      renamer.updateOptions({ aggressive: config.aggressiveRename });
-      if (previous.anthropicModel !== config.anthropicModel) {
-        await namer.init();
-      }
-      refreshStatus();
+      guarded("configChange", (async () => {
+        const previous: TerminameConfig = config;
+        config = readConfig();
+        await namer.updateOptions({ timeoutMs: config.timeoutMs, userRules: config.rules, forced: config.provider });
+        renamer.updateOptions({ aggressive: config.aggressiveRename });
+        if (previous.anthropicModel !== config.anthropicModel) {
+          await namer.init();
+        }
+        refreshStatus();
+      })());
     }),
     vscode.commands.registerCommand("terminame.renameNow", async () => {
       const t = vscode.window.activeTerminal;
