@@ -45,7 +45,30 @@ describe("Namer.init", () => {
   });
 });
 
+describe("Namer.cacheKey", () => {
+  it("is the bare command without a folder, command plus folder with one", () => {
+    expect(Namer.cacheKey({ command: "npm run dev" })).toBe("npm run dev");
+    expect(Namer.cacheKey({ command: "npm run dev", cwdBasename: "web" })).toBe("npm run dev\nweb");
+  });
+});
+
 describe("Namer.name", () => {
+  it("keys the cache by command and folder", async () => {
+    const p = fake("claudeCli", { answer: "Api Tests" });
+    const cache = new NameCache(store());
+    const n = new Namer([p], cache, base()); await n.init();
+    const sig = () => new AbortController().signal;
+
+    expect(await n.name({ command: "pytest", cwdBasename: "api" }, sig())).toEqual({ name: "Api Tests", source: "model" });
+    expect(await n.name({ command: "pytest", cwdBasename: "billing" }, sig())).toEqual({ name: "Api Tests", source: "model" });
+    expect(p.calls).toBe(2);                              // the second folder is a cache miss
+    expect(cache.size).toBe(2);
+    expect(cache.get("pytest\napi")).toBe("Api Tests");
+    expect(cache.get("pytest\nbilling")).toBe("Api Tests");
+
+    expect(await n.name({ command: "pytest", cwdBasename: "api" }, sig())).toEqual({ name: "Api Tests", source: "cache" });
+    expect(p.calls).toBe(2);
+  });
   it("uses cache first", async () => {
     const p = fake("claudeCli");
     const cache = new NameCache(store());

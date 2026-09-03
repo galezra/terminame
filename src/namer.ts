@@ -22,6 +22,14 @@ export class Namer {
 
   get activeId(): ProviderId | "rules" { return this.active?.id ?? "rules"; }
 
+  /**
+   * Cache key for a request. The folder is part of the key because the same command deserves a
+   * different name per project (`pytest` in `billing` vs `api`), and the model is told the folder.
+   */
+  static cacheKey(req: NameRequest): string {
+    return req.cwdBasename ? `${req.command}\n${req.cwdBasename}` : req.command;
+  }
+
   async updateOptions(opts: Partial<NamerOptions>): Promise<void> {
     const forcedChanged = opts.forced !== undefined && opts.forced !== this.opts.forced;
     this.opts = { ...this.opts, ...opts };
@@ -54,7 +62,8 @@ export class Namer {
   }
 
   async name(req: NameRequest, signal: AbortSignal): Promise<{ name: string; source: NameSource } | null> {
-    const cached = this.cache.get(req.command);
+    const key = Namer.cacheKey(req);
+    const cached = this.cache.get(key);
     if (cached) return { name: cached, source: "cache" };
     if (!this.active) return { name: this.rulesName(req.command), source: "rules" };
 
@@ -79,10 +88,12 @@ export class Namer {
     const clean = raw ? sanitizeName(raw) : null;
     if (clean) {
       this.failures = 0;
-      await this.cache.set(req.command, clean);
+      await this.cache.set(key, clean);
       return { name: clean, source: "model" };
     }
 
+    // An unusable answer (empty, or nothing sanitizeName could keep) counts as a strike just like an
+    // error or timeout: three in a row means the provider is broken for us, not that one command was odd.
     this.failures++;
     this.opts.log(`provider ${provider.id} miss (${this.failures}/${this.opts.maxFailures})`);
     if (this.failures >= this.opts.maxFailures) {

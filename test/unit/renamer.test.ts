@@ -24,11 +24,32 @@ describe("Renamer", () => {
     expect(h.names.get("a")).toBe("Start App");
   });
   it("queues for a background terminal and applies when it becomes active", async () => {
-    const h = host({ t: a }); const r = new Renamer(h, { aggressive: false });
+    const act = { t: a }; const h = host(act); const r = new Renamer(h, { aggressive: false });
     await r.setName(b, "Tests");
     expect(h.names.get("b")).toBeUndefined();
+    act.t = b;
     await r.onActiveChanged(b);
     expect(h.names.get("b")).toBe("Tests");
+  });
+  it("keeps the name pending when the terminal is no longer active on the event", async () => {
+    const act = { t: a }; const h = host(act); const r = new Renamer(h, { aggressive: false });
+    await r.setName(b, "Tests");
+    await r.onActiveChanged(b);              // host still reports `a` as active
+    expect(h.names.get("b")).toBeUndefined();
+    expect(h.renames).toEqual([]);
+    act.t = b;                               // pending survived: it applies on the next event
+    await r.onActiveChanged(b);
+    expect(h.names.get("b")).toBe("Tests");
+  });
+  it("hasApplied is true only once a name has actually been set", async () => {
+    const act = { t: a }; const h = host(act); const r = new Renamer(h, { aggressive: false });
+    expect(r.hasApplied(a)).toBe(false);
+    await r.setName(b, "Tests");             // queued, not applied
+    expect(r.hasApplied(b)).toBe(false);
+    await r.setName(a, "Start App");
+    expect(r.hasApplied(a)).toBe(true);
+    r.forget(a);
+    expect(r.hasApplied(a)).toBe(false);
   });
   it("aggressive mode focuses, renames, and restores focus", async () => {
     const act = { t: a }; const h = host(act); const r = new Renamer(h, { aggressive: true });
@@ -59,8 +80,8 @@ describe("Renamer", () => {
     await r.onCommandEnd(a, "shell"); expect(h.names.get("a")).toBe("zsh");
   });
   it("forget drops pending names", async () => {
-    const h = host({ t: a }); const r = new Renamer(h, { aggressive: false });
-    await r.setName(b, "Tests"); r.forget(b); await r.onActiveChanged(b);
+    const act = { t: a }; const h = host(act); const r = new Renamer(h, { aggressive: false });
+    await r.setName(b, "Tests"); r.forget(b); act.t = b; await r.onActiveChanged(b);
     expect(h.names.get("b")).toBeUndefined();
   });
   it("aggressive mode restores focus even when rename fails", async () => {

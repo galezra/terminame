@@ -25,6 +25,17 @@ describe("NameCache", () => {
     expect(c.get("c")).toBe("C");
     expect(c.size).toBe(2);
   });
+  it("starts empty when the stored value is not a list of pairs", async () => {
+    const store = memStore();
+    store.data["terminame.names"] = "garbage";
+    expect(new NameCache(store).size).toBe(0);
+
+    store.data["terminame.names"] = [["a", "A"], "nope", ["b"], [1, 2], ["c", "C"]];
+    const c = new NameCache(store);
+    expect(c.size).toBe(2);
+    expect(c.get("a")).toBe("A");
+    expect(c.get("c")).toBe("C");
+  });
   it("clears", async () => {
     const c = new NameCache(memStore());
     await c.set("a", "A"); await c.clear();

@@ -30,6 +30,12 @@ export class Renamer<T extends object> {
 
   isUserOwned(t: T): boolean { return this.state.get(t)?.userOwned ?? false; }
 
+  /** True once we have actually applied a name to this terminal (so there is something to revert). */
+  hasApplied(t: T): boolean {
+    const s = this.state.get(t);
+    return s !== undefined && s.applied !== undefined;
+  }
+
   private detectUserRename(t: T, s: State): boolean {
     const current = this.host.currentName(t);
     if (s.applied !== undefined && current !== s.applied && current !== s.original) {
@@ -70,6 +76,9 @@ export class Renamer<T extends object> {
     const s = this.state.get(t);
     if (!s || s.pending === undefined) return;
     if (this.detectUserRename(t, s)) return;
+    // The host renames whatever is active, so confirm `t` really is active now — the active terminal
+    // can have changed again between the event firing and this running. Keep the name pending if not.
+    if (this.host.activeTerminal() !== t) return;
     await this.apply(t, s, s.pending);
   }
 
