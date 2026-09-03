@@ -47,6 +47,13 @@ Terminame is naming tabs from rules alone. Click it to open the log. It stays hi
 
 - VS Code can only rename the **active** terminal, so a background tab is renamed the moment you click it.
 - Requires terminal shell integration (on by default for zsh, bash, fish, PowerShell).
+- **Kiro CLI / Amazon Q users:** Kiro's terminal autocomplete wraps every new zsh in its own pty, and in Cursor that wrapper breaks shell integration ("Shell integration: Injection failed to activate" in the tab tooltip), so Terminame never sees your commands. Tell Kiro to stand down inside Cursor by adding to your Cursor `settings.json`:
+
+  ```json
+  "terminal.integrated.env.osx": { "PROCESS_LAUNCHED_BY_Q": "1" }
+  ```
+
+  Then open a new terminal. Existing terminals keep the wrapper until closed.
 - If you rename a tab yourself, Terminame leaves it alone until it is closed.
 - If you rename a tab by hand *before* Terminame has ever named it, and that tab is not the active one, Terminame's first queued rename may overwrite yours once. After Terminame has named a tab, your manual renames are respected.
 - `terminame.aggressiveRename` is experimental: it has not been verified against the live VS Code API and can steal focus mid-typing.
