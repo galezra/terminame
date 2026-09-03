@@ -6,6 +6,11 @@ describe("sanitizeName", () => {
     expect(sanitizeName('"Start App."\nBecause it runs the dev server')).toBe("Start App");
     expect(sanitizeName("**Rebase**")).toBe("Rebase");
   });
+  it("strips bullet and bracket wrappers", () => {
+    expect(sanitizeName("(Start App)")).toBe("Start App");
+    expect(sanitizeName("• Rebase")).toBe("Rebase");
+    expect(sanitizeName("[Docker Up]")).toBe("Docker Up");
+  });
   it("caps at 3 words and 24 chars", () => {
     expect(sanitizeName("Start The Development Server Now")).toBe("Start The Development");
     expect(sanitizeName("Supercalifragilisticexpialidocious Build")).toBe("Supercalifragilisticexpi");

@@ -1,3 +1,5 @@
+import { capLength } from "./sanitize";
+
 export interface Rule {
   match: string;
   name: string;
@@ -16,6 +18,7 @@ export const BUILTIN_RULES: Rule[] = [
   { match: "next dev*", name: "Start App" },
   { match: "python manage.py runserver*", name: "Start App" },
   { match: "rails s*", name: "Start App" },
+  { match: "rails server*", name: "Start App" },
   { match: "uvicorn*", name: "Start App" },
   { match: "flask run*", name: "Start App" },
   { match: "npm test*", name: "Tests" },
@@ -59,14 +62,78 @@ export const BUILTIN_RULES: Rule[] = [
   { match: "codex*", name: "Codex" },
 ];
 
-const CHAIN_SPLIT = /\s*(?:&&|\|\||;)\s*/;
-const PIPE_SPLIT = /\s*\|(?!\|)\s*/;
+const CHAIN_SEPARATORS = ["&&", "||", ";"];
+const PIPE_SEPARATORS = ["|"];
 const PREFIX_STRIP = /^(?:(?:sudo|time|env|nohup)\s+|[A-Za-z_][A-Za-z0-9_]*=\S*\s+)+/;
+const WRAPPERS: Record<string, string> = { "(": ")", "{": "}" };
+
+/**
+ * Split on the given separators, ignoring any that fall inside single or double quotes, so
+ * `grep "a||b" file` stays one segment. Separators are matched in the order given, so pass
+ * longer ones first. Parts are trimmed; empty parts are kept (callers filter).
+ */
+export function splitTopLevel(input: string, separators: string[]): string[] {
+  const parts: string[] = [];
+  let current = "";
+  let quote: string | null = null;
+  let i = 0;
+  while (i < input.length) {
+    const ch = input[i];
+    if (quote !== null) {
+      current += ch;
+      if (ch === quote) quote = null;
+      i++;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      current += ch;
+      i++;
+      continue;
+    }
+    const sep = separators.find((s) => input.startsWith(s, i));
+    if (sep !== undefined) {
+      parts.push(current.trim());
+      current = "";
+      i += sep.length;
+      continue;
+    }
+    current += ch;
+    i++;
+  }
+  parts.push(current.trim());
+  return parts;
+}
+
+/** Strip one pair of `(` `)` or `{` `}` wrapping the whole command: `(cd api && pytest)` → `cd api && pytest`. */
+function unwrapOnce(input: string): string {
+  const s = input.trim();
+  const open = s[0];
+  const close = WRAPPERS[open];
+  if (close === undefined || !s.endsWith(close)) return s;
+  let depth = 0;
+  let quote: string | null = null;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (quote !== null) {
+      if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'") { quote = ch; continue; }
+    if (ch === open) depth++;
+    else if (ch === close) {
+      depth--;
+      // The opening bracket closes here; only a close at the very end wraps the whole command.
+      if (depth === 0) return i === s.length - 1 ? s.slice(1, -1).trim() : s;
+    }
+  }
+  return s;
+}
 
 export function pickSegment(commandLine: string): string {
-  const chain = commandLine.split(CHAIN_SPLIT).filter((s) => s.length > 0);
+  const chain = splitTopLevel(unwrapOnce(commandLine), CHAIN_SEPARATORS).filter((s) => s.length > 0);
   const last = chain[chain.length - 1] ?? "";
-  return last.split(PIPE_SPLIT)[0] ?? "";
+  return splitTopLevel(last, PIPE_SEPARATORS)[0] ?? "";
 }
 
 export function normalizeCommand(commandLine: string): string {
@@ -105,9 +172,25 @@ function compile(match: string): RegExp {
   return new RegExp(`^${body}$`);
 }
 
+/**
+ * Compiled-pattern memo. A `null` value marks a pattern `new RegExp` rejected (e.g. the duplicate
+ * capture group in a user rule like `scp <host> <host>`), so it is skipped without recompiling.
+ */
+const compiled = new Map<string, RegExp | null>();
+
 export function matchRules(normalized: string, userRules: Rule[] = []): string | null {
   for (const rule of [...userRules, ...BUILTIN_RULES]) {
-    const m = compile(rule.match).exec(normalized);
+    let re = compiled.get(rule.match);
+    if (re === undefined) {
+      try {
+        re = compile(rule.match);
+      } catch {
+        re = null;
+      }
+      compiled.set(rule.match, re);
+    }
+    if (re === null) continue;
+    const m = re.exec(normalized);
     if (!m) continue;
     let name = rule.name;
     for (const [k, v] of Object.entries(m.groups ?? {})) {
@@ -122,9 +205,9 @@ export function fallbackName(normalized: string): string {
   const first = normalized.split(" ")[0] ?? "";
   const base = first.split("/").pop() ?? first;
   if (!base) return "Terminal";
-  return base[0].toUpperCase() + base.slice(1);
+  return capLength(base[0].toUpperCase() + base.slice(1));
 }
 
 export function ruleName(normalized: string, userRules: Rule[] = []): string {
-  return matchRules(normalized, userRules) ?? fallbackName(normalized);
+  return capLength(matchRules(normalized, userRules) ?? fallbackName(normalized));
 }
