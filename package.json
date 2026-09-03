@@ -53,7 +53,7 @@
         },
         "terminame.timeoutMs": {
           "type": "number",
-          "default": 6000,
+          "default": 10000,
           "minimum": 500,
           "description": "Model call timeout in milliseconds."
         },
@@ -127,7 +127,7 @@
     "compile-tests": "tsc -p tsconfig.test.json",
     "test": "vitest run",
     "test:ext": "npm run build && npm run compile-tests && vscode-test",
-    "package": "vsce package --no-dependencies"
+    "package": "npm run build && vsce package --no-dependencies"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",

@@ -14,13 +14,15 @@ describe("ClaudeCliProvider", () => {
     const p = new ClaudeCliProvider(runner({ stdout: "1.0.0", code: 0 }), async () => "/usr/local/bin/claude");
     expect(await p.isAvailable()).toBe(true);
   });
-  it("calls claude -p with haiku and text output, from the home dir", async () => {
+  it("calls claude -p with haiku, text output, no MCP and a single turn, from the home dir", async () => {
     const cap: { args?: string[]; cwd?: string } = {};
     const p = new ClaudeCliProvider(runner({ stdout: "Start App\n", code: 0 }, cap), async () => "/usr/local/bin/claude");
     await p.isAvailable();
     const out = await p.name({ command: "npm run dev", cwdBasename: "web" }, new AbortController().signal);
     expect(out).toBe("Start App\n");
-    expect(cap.args).toEqual(expect.arrayContaining(["-p", "--model", "haiku", "--output-format", "text"]));
+    expect(cap.args).toEqual(
+      expect.arrayContaining(["-p", "--model", "haiku", "--output-format", "text", "--strict-mcp-config", "--max-turns", "1"]),
+    );
     expect(cap.args!.join(" ")).toContain("Command: npm run dev");
     expect(cap.cwd).not.toContain("web");
   });

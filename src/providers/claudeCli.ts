@@ -63,7 +63,7 @@ export class ClaudeCliProvider implements NameProvider {
   async name(req: NameRequest, signal: AbortSignal): Promise<string | null> {
     if (!this.bin) return null;
     const prompt = `${SYSTEM_PROMPT}\n\n${userPrompt(req)}`;
-    const r = await this.run(this.bin, ["-p", prompt, "--model", "haiku", "--output-format", "text"], { cwd: homedir(), signal, env: this.env() });
+    const r = await this.run(this.bin, ["-p", prompt, "--model", "haiku", "--output-format", "text", "--strict-mcp-config", "--max-turns", "1"], { cwd: homedir(), signal, env: this.env() });
     return r.code === 0 ? r.stdout : null;
   }
 }
