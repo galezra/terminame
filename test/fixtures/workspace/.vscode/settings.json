@@ -1,0 +1,5 @@
+{
+  "terminame.provider": "rules",
+  "terminame.mode": "instant",
+  "terminal.integrated.shellIntegration.enabled": true
+}
