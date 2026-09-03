@@ -94,8 +94,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   context.subscriptions.push(
     watchShell({
-      onStart: (e) => { guarded("handleStart", handleStart(e.terminal, e.commandLine, e.cwdBasename)); },
+      onStart: (e) => {
+        log.appendLine(`event: start "${e.commandLine}" (confidence ${e.confidence}) in "${e.terminal.name}"`);
+        guarded("handleStart", handleStart(e.terminal, e.commandLine, e.cwdBasename));
+      },
       onEnd: (e) => {
+        log.appendLine(`event: end "${e.commandLine}" exit=${e.exitCode} in "${e.terminal.name}"`);
         if (!config.enabled) return;
         // An ignored command never renamed anything, so it must not trigger the idle name either.
         if (isIgnored(normalizeCommand(e.commandLine), config.ignore)) return;
@@ -107,6 +111,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         }
         guarded("onCommandEnd", renamer.onCommandEnd(e.terminal, config.idleName, e.cwdBasename));
       },
+    }),
+    vscode.window.onDidChangeTerminalShellIntegration((e) => {
+      log.appendLine(`event: shell integration attached in "${e.terminal.name}"`);
     }),
     vscode.window.onDidChangeActiveTerminal((t) => {
       if (!config.enabled) return;
@@ -120,6 +127,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (timer) { clearTimeout(timer); hintTimers.delete(t); }
     }),
     vscode.window.onDidOpenTerminal((t) => {
+      log.appendLine(`event: terminal opened "${t.name}"${"pty" in t.creationOptions ? " (pty)" : ""}`);
       // Extension-owned pty terminals never get shell integration by design; only real shells earn the hint.
       if ("pty" in t.creationOptions) return;
       // Shell-integration hint: if the first command never produces an execution event, tell the user once.
@@ -169,6 +177,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   await namer.init();
   refreshStatus();
   log.appendLine(`Terminame activated (provider: ${namer.activeId}, mode: ${config.mode})`);
+  const existing = vscode.window.terminals.map((t) => `"${t.name}"${t.shellIntegration ? "+si" : "-si"}`);
+  log.appendLine(`terminals at activation: ${existing.length ? existing.join(", ") : "none"}`);
 }
 
 export function deactivate(): void {}

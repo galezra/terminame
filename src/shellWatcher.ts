@@ -5,6 +5,8 @@ export interface CommandEvent {
   terminal: vscode.Terminal;
   commandLine: string;
   cwdBasename?: string;
+  /** vscode.TerminalShellExecutionCommandLineConfidence: 0 low, 1 medium, 2 high */
+  confidence: number;
 }
 
 export interface ShellHandlers {
@@ -16,6 +18,7 @@ function toEvent(terminal: vscode.Terminal, execution: vscode.TerminalShellExecu
   return {
     terminal,
     commandLine: execution.commandLine.value,
+    confidence: execution.commandLine.confidence,
     cwdBasename: execution.cwd ? basename(execution.cwd.fsPath) : undefined,
   };
 }
