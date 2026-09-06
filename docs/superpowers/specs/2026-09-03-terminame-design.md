@@ -24,9 +24,10 @@ user already has, it uses that model; otherwise it falls back to a built-in rule
 ## User-facing behaviour
 
 1. User runs a command in an integrated terminal.
-2. If a model provider is available: the extension waits for the model (default
-   mode `waitForModel`) and renames the tab with the sanitised answer. On timeout or
-   error it renames with the rules-table name instead.
+2. If a model provider is available: in the default mode `instant` the tab is renamed from the
+   rules table immediately and renamed again with the sanitised model answer when it arrives;
+   in `waitForModel` the extension waits for the model first. On timeout or error the rules
+   name stands.
 3. If no provider is available: the tab is renamed from the rules table immediately.
 4. Trivial commands (`ls`, `cd`, `clear`, …) never rename.
 5. When the command ends the name is kept by default (`idleName: keep`).
@@ -65,7 +66,7 @@ the chain falls through to the next rung; the status bar hint updates once.
    under 3 chars) plus `terminame.ignore`.
 4. **Cache.** `globalState`-backed map `normalisedCommand → name`. Hit → rename now.
 5. **Model call.** One in-flight request per terminal; a newer command cancels the older
-   request. Timeout `terminame.timeoutMs` (default 6000).
+   request. Timeout `terminame.timeoutMs` (default 20000; measured `claude -p` round-trips are 5–7 s with spikes past 10 s).
 6. **Sanitise.** Trim; strip quotes/trailing punctuation; ≤3 words; ≤24 chars;
    Title Case. Empty result = miss.
 7. **Rename + cache.**
@@ -147,8 +148,8 @@ providers) and the sanitiser are pure enough to unit-test without VS Code.
 | Key | Default | Notes |
 |---|---|---|
 | `enabled` | `true` | |
-| `mode` | `"waitForModel"` | or `"instant"` (rules first, refine when model answers) |
-| `timeoutMs` | `6000` | |
+| `mode` | `"instant"` | rules name at once, model name when it answers; `"waitForModel"` waits (changed 2026-09-06: CLI calls take 5–7 s) |
+| `timeoutMs` | `20000` | |
 | `provider` | `"auto"` | `vscodeLm` \| `claudeCli` \| `anthropic` \| `rules` |
 | `anthropic.apiKey` | unset | set via command, stored in SecretStorage |
 | `anthropic.model` | `"claude-haiku-4-5"` | |

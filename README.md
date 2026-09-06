@@ -34,8 +34,8 @@ Terminame is naming tabs from rules alone. Click it to open the log. It stays hi
 | Setting | Default | What it does |
 |---|---|---|
 | `terminame.enabled` | `true` | Master switch |
-| `terminame.mode` | `waitForModel` | `instant` renames from rules first, then refines |
-| `terminame.timeoutMs` | `10000` | Model timeout |
+| `terminame.mode` | `instant` | Rules name at once, then the model name when it answers. `waitForModel` waits for the model |
+| `terminame.timeoutMs` | `20000` | Model timeout |
 | `terminame.provider` | `auto` | Force `vscodeLm`, `claudeCli`, `anthropic`, or `rules` |
 | `terminame.anthropic.model` | `claude-haiku-4-5` | Model for the SDK provider |
 | `terminame.rules` | `[]` | Your own `{ "match": "make deploy*", "name": "Deploy" }` rows, checked first. `*` matches anything; `<host>` captures one word |

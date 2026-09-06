@@ -5,6 +5,14 @@
   "version": "0.1.0",
   "publisher": "gal-ezra",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/galezra/terminame.git"
+  },
+  "bugs": {
+    "url": "https://github.com/galezra/terminame/issues"
+  },
+  "homepage": "https://github.com/galezra/terminame#readme",
   "engines": {
     "vscode": "^1.93.0"
   },
@@ -48,12 +56,12 @@
             "waitForModel",
             "instant"
           ],
-          "default": "waitForModel",
+          "default": "instant",
           "description": "waitForModel: rename once the model answers. instant: rename from rules first, then refine."
         },
         "terminame.timeoutMs": {
           "type": "number",
-          "default": 10000,
+          "default": 20000,
           "minimum": 500,
           "description": "Model call timeout in milliseconds."
         },

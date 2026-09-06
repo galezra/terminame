@@ -27,8 +27,8 @@ export function readConfig(): TerminameConfig {
 
   return {
     enabled: c.get<boolean>("enabled", true),
-    mode: c.get<"waitForModel" | "instant">("mode", "waitForModel"),
-    timeoutMs: c.get<number>("timeoutMs", 10000),
+    mode: c.get<"waitForModel" | "instant">("mode", "instant"),
+    timeoutMs: c.get<number>("timeoutMs", 20000),
     provider: c.get<ProviderId | "rules" | "auto">("provider", "auto"),
     anthropicModel: c.get<string>("anthropic.model", "claude-haiku-4-5"),
     rules,
