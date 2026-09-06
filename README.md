@@ -5,6 +5,15 @@ Names your terminal tabs after what is running in them. `npm run dev` becomes **
 
 Works on install with zero configuration, in Cursor and VS Code.
 
+## Install
+
+Not on the marketplace yet. Two options:
+
+- **Download:** grab `terminame-<version>.vsix` from the [latest release](https://github.com/galezra/terminame/releases/latest), then in Cursor or VS Code run **Extensions: Install from VSIX...** from the command palette (or `cursor --install-extension terminame-0.1.0.vsix`).
+- **Build it:** `npm install && npm run package` in a clone produces the same file (needs Node 20+).
+
+Reload the window once after installing.
+
 ## How names are chosen
 
 1. **Editor model** — if your editor exposes one (VS Code with Copilot). Not available in Cursor.
@@ -63,6 +72,11 @@ Terminame is naming tabs from rules alone. Click it to open the log. It stays hi
 - **Windows:** the Claude Code CLI lookup does not append `.exe`, so `claude.exe` is not found and that
   provider is skipped. Terminame falls back to the editor model, the Anthropic SDK, or rules.
 
+- Model answers ending in a balanced `)` or `]` lose the closing bracket ("Tests (api)" becomes "Tests (api").
+- With `idleName` set to `folder` or `shell` and mode `waitForModel`, a command that finishes before the model answers still ends up with the model's name.
+- `aggressiveRename` has not been exercised against the live editor API and is marked experimental.
+- On Windows the Claude Code CLI lookup has no `.exe`/`.cmd` handling, so that rung silently degrades to rules.
+
 ## Development
 
 Requires Node 20+.
@@ -72,3 +86,5 @@ Requires Node 20+.
     npm test             # unit tests (Vitest)
     npm run test:ext     # extension-host smoke tests (downloads a VS Code build on first run)
     npm run package      # build a .vsix
+
+`docs/` holds the original design spec and implementation plan.

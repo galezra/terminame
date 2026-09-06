@@ -16,8 +16,17 @@
   "engines": {
     "vscode": "^1.93.0"
   },
+  "icon": "icon.png",
   "categories": [
     "Other"
+  ],
+  "keywords": [
+    "terminal",
+    "tab",
+    "rename",
+    "cursor",
+    "claude",
+    "shell integration"
   ],
   "activationEvents": [
     "onStartupFinished"
