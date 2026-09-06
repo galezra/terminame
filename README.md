@@ -5,6 +5,8 @@ Names your terminal tabs after what is running in them. `npm run dev` becomes **
 
 Works on install with zero configuration, in Cursor and VS Code.
 
+![Terminal tabs named Git Log, Tests, Build and Start App](docs/screenshot.png)
+
 ## Install
 
 Not on the marketplace yet. Two options:
@@ -25,9 +27,7 @@ Reload the window once after installing.
 
 Answers are cached per command **and folder**, so each distinct command in a given folder costs one model call.
 
-A status-bar item (`$(terminal) Terminame: rules`) appears when auto-detection found no model and
-Terminame is naming tabs from rules alone. Click it to open the log. It stays hidden when you set
-`terminame.provider` to `rules` yourself, and when a model provider is in use.
+A status-bar item reading "Terminame: rules" appears when auto-detection found no model and Terminame is naming tabs from rules alone. Click it to open the log. It stays hidden when a model provider is in use, or when you set `terminame.provider` to `rules` yourself.
 
 ## Commands
 
@@ -56,26 +56,31 @@ Terminame is naming tabs from rules alone. Click it to open the log. It stays hi
 
 - VS Code can only rename the **active** terminal, so a background tab is renamed the moment you click it.
 - Requires terminal shell integration (on by default for zsh, bash, fish, PowerShell).
-- **Kiro CLI / Amazon Q users:** Kiro's terminal autocomplete starts a fresh zsh that skips the editor's injected shell-integration file, so Cursor shows "Shell integration: Injection failed to activate" and Terminame never sees your commands. Keep Kiro and install shell integration manually by adding this to the end of `~/.zshrc`:
+- If you rename a tab yourself, Terminame leaves it alone until it is closed. One exception: a tab you rename by hand *before* Terminame has ever named it, while it is not the active tab, can be overwritten once by the first queued rename.
+- **Windows:** the Claude Code CLI lookup does not append `.exe`, so that provider is skipped and Terminame falls back to the editor model, the Anthropic SDK, or rules.
 
-  ```zsh
-  if [[ "$TERM_PROGRAM" == "vscode" && -z "$VSCODE_SHELL_INTEGRATION" ]] && command -v cursor >/dev/null 2>&1; then
-    unset VSCODE_INJECTION
-    . "$(cursor --locate-shell-integration-path zsh)"
-  fi
-  ```
+## Troubleshooting
 
-  Then open a new terminal. Existing terminals keep the old shell until closed.
-- If you rename a tab yourself, Terminame leaves it alone until it is closed.
-- If you rename a tab by hand *before* Terminame has ever named it, and that tab is not the active one, Terminame's first queued rename may overwrite yours once. After Terminame has named a tab, your manual renames are respected.
-- `terminame.aggressiveRename` is experimental: it has not been verified against the live VS Code API and can steal focus mid-typing.
-- **Windows:** the Claude Code CLI lookup does not append `.exe`, so `claude.exe` is not found and that
-  provider is skipped. Terminame falls back to the editor model, the Anthropic SDK, or rules.
+**Nothing happens.** Run *Terminame: Show log*. Every command should produce a `start` line, an `end` line, and a `→` line with the chosen name. No `start` line means the editor never reported the command: hover the terminal tab and check that shell integration is active.
+
+**"Shell integration: Injection failed to activate" (Kiro CLI / Amazon Q users).** Kiro's terminal autocomplete starts a fresh zsh that skips the editor's injected shell-integration file. Keep Kiro and install shell integration manually by adding this to the end of `~/.zshrc`:
+
+```zsh
+if [[ "$TERM_PROGRAM" == "vscode" && -z "$VSCODE_SHELL_INTEGRATION" ]] && command -v cursor >/dev/null 2>&1; then
+  unset VSCODE_INJECTION
+  . "$(cursor --locate-shell-integration-path zsh)"
+fi
+```
+
+Then open a new terminal. Existing terminals keep the old shell until closed.
+
+**Names come from rules only.** The status-bar item "Terminame: rules" means no model provider was found. Install Claude Code and run `/login`, sign in to Copilot, or set an Anthropic key. A model call that exceeds `terminame.timeoutMs` also falls back to a rules name; three misses in a row disable that provider for the session.
+
+## Known issues
 
 - Model answers ending in a balanced `)` or `]` lose the closing bracket ("Tests (api)" becomes "Tests (api").
 - With `idleName` set to `folder` or `shell` and mode `waitForModel`, a command that finishes before the model answers still ends up with the model's name.
-- `aggressiveRename` has not been exercised against the live editor API and is marked experimental.
-- On Windows the Claude Code CLI lookup has no `.exe`/`.cmd` handling, so that rung silently degrades to rules.
+- `terminame.aggressiveRename` is experimental: not verified against the live editor API, and it can steal focus mid-typing.
 
 ## Development
 
