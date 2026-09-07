@@ -5,7 +5,7 @@ Names your terminal tabs after what is running in them. `npm run dev` becomes **
 
 Works on install with zero configuration, in Cursor and VS Code.
 
-![Terminal tabs named Git Log, Tests, Build and Start App](docs/screenshot.png)
+![Terminal tabs being named Start App, Tests and Git Log as the commands run](docs/demo.gif)
 
 ## Install
 
