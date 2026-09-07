@@ -100,4 +100,12 @@ Requires Node 20+.
     npm run test:ext     # extension-host smoke tests (downloads a VS Code build on first run)
     npm run package      # build a .vsix
 
+### Releasing
+
+Bump `version` in `package.json`, add the changelog entry, merge to `main`, then tag and push:
+
+    git tag v0.1.1 && git push origin v0.1.1
+
+The Publish workflow builds the `.vsix`, attaches it to a GitHub release, and publishes it to each store whose token is present as a repository secret: `VSCE_PAT` (Azure DevOps personal access token with Marketplace *Manage* scope) for the Visual Studio Marketplace, `OVSX_PAT` (Open VSX access token) for Open VSX. A missing secret skips that store; upload the `.vsix` from the release by hand instead.
+
 `docs/` holds the original design spec and implementation plan.
