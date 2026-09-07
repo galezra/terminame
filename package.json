@@ -2,7 +2,7 @@
   "name": "terminame",
   "displayName": "Terminame",
   "description": "Auto-names terminal tabs from the command running in them",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "GalEzra",
   "license": "MIT",
   "repository": {

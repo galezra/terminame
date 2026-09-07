@@ -11,6 +11,7 @@ export interface RenamerHost<T> {
 interface State {
   original: string;   // name before we ever touched it (e.g. "zsh")
   applied?: string;   // last name we set
+  before?: string;    // `applied` when the current command started (see mark/revert)
   pending?: string;   // name waiting for the terminal to become active
   userOwned: boolean;
 }
@@ -87,6 +88,18 @@ export class Renamer<T extends object> {
     const s = this.stateFor(t);
     const target = idle === "folder" ? (cwdBasename ?? s.original) : s.original;
     await this.setName(t, target);
+  }
+
+  /** Snapshot at command start so `revert` can undo whatever names that command produced. */
+  mark(t: T): void { const s = this.stateFor(t); s.before = s.applied; }
+
+  /** Undo names applied since `mark` (e.g. the command turned out not to exist). */
+  async revert(t: T): Promise<void> {
+    const s = this.state.get(t);
+    if (!s) return;
+    s.pending = undefined;
+    if (s.applied === s.before) return;
+    await this.setName(t, s.before ?? s.original);
   }
 
   forget(t: T): void { this.state.delete(t); }

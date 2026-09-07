@@ -51,6 +51,29 @@ describe("Renamer", () => {
     r.forget(a);
     expect(r.hasApplied(a)).toBe(false);
   });
+  it("revert undoes names applied since mark, back to the previous name or the original", async () => {
+    const h = host({ t: a }); const r = new Renamer(h, { aggressive: false });
+    r.mark(a);
+    await r.setName(a, "ccc");
+    await r.revert(a);
+    expect(h.names.get("a")).toBe("zsh");
+    r.mark(a);
+    await r.setName(a, "Git Status");
+    r.mark(a);
+    await r.setName(a, "ddd");
+    await r.setName(a, "Model Name");
+    await r.revert(a);
+    expect(h.names.get("a")).toBe("Git Status");
+  });
+  it("revert drops a pending name without renaming", async () => {
+    const act = { t: a }; const h = host(act); const r = new Renamer(h, { aggressive: false });
+    r.mark(b);
+    await r.setName(b, "ccc");
+    await r.revert(b);
+    act.t = b;
+    await r.onActiveChanged(b);
+    expect(h.renames).toEqual([]);
+  });
   it("aggressive mode focuses, renames, and restores focus", async () => {
     const act = { t: a }; const h = host(act); const r = new Renamer(h, { aggressive: true });
     await r.setName(b, "Tests");

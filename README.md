@@ -9,10 +9,12 @@ Works on install with zero configuration, in Cursor and VS Code.
 
 ## Install
 
-Not on the marketplace yet. Two options:
+Search for **Terminame** in the Extensions view, or install from the store for your editor:
 
-- **Download:** grab `terminame-<version>.vsix` from the [latest release](https://github.com/galezra/terminame/releases/latest), then in Cursor or VS Code run **Extensions: Install from VSIX...** from the command palette (or `cursor --install-extension terminame-0.1.0.vsix`).
-- **Build it:** `npm install && npm run package` in a clone produces the same file (needs Node 20+).
+- **VS Code:** [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=GalEzra.terminame), or `code --install-extension GalEzra.terminame`
+- **Cursor and other VS Code forks:** [Open VSX](https://open-vsx.org/extension/GalEzra/terminame), or `cursor --install-extension GalEzra.terminame`
+
+To install from a file instead, grab `terminame-<version>.vsix` from the [latest release](https://github.com/galezra/terminame/releases/latest) and run **Extensions: Install from VSIX...** from the command palette. `npm install && npm run package` in a clone produces the same file (needs Node 20+).
 
 Reload the window once after installing.
 
@@ -24,6 +26,8 @@ Reload the window once after installing.
 3. **Anthropic SDK** — if the SDK can find credentials on its own (`ANTHROPIC_API_KEY`, an
    `ant auth login` profile) or you set a key via *Terminame: Set Anthropic API key*.
 4. **Built-in rules** — always available, instant, offline.
+
+A command the shell cannot find (exit code 127, `command not found`) is skipped: no model call, and the tab keeps the name it had.
 
 Answers are cached per command **and folder**, so each distinct command in a given folder costs one model call.
 
@@ -63,16 +67,20 @@ A status-bar item reading "Terminame: rules" appears when auto-detection found n
 
 **Nothing happens.** Run *Terminame: Show log*. Every command should produce a `start` line, an `end` line, and a `→` line with the chosen name. No `start` line means the editor never reported the command: hover the terminal tab and check that shell integration is active.
 
-**"Shell integration: Injection failed to activate" (Kiro CLI / Amazon Q users).** Kiro's terminal autocomplete starts a fresh zsh that skips the editor's injected shell-integration file. Keep Kiro and install shell integration manually by adding this to the end of `~/.zshrc`:
+**Nothing happens, or only the first command in each terminal gets a name, and the tab tooltip says "Shell integration: Injection failed to activate".** Some terminal tools (autocomplete wrappers, shell launchers) start their own shell inside the editor terminal, and that shell never loads the editor's injected shell-integration file. Load it yourself from `~/.zshrc`:
 
 ```zsh
-if [[ "$TERM_PROGRAM" == "vscode" && -z "$VSCODE_SHELL_INTEGRATION" ]] && command -v cursor >/dev/null 2>&1; then
+# VS Code / Cursor shell integration. Must run before your prompt theme loads.
+if [[ "$TERM_PROGRAM" == "vscode" && -z "$VSCODE_SHELL_INTEGRATION" ]]; then
   unset VSCODE_INJECTION
-  . "$(cursor --locate-shell-integration-path zsh)"
+  for __editor in cursor code; do
+    command -v "$__editor" >/dev/null 2>&1 && . "$("$__editor" --locate-shell-integration-path zsh)" && break
+  done
+  unset __editor
 fi
 ```
 
-Then open a new terminal. Existing terminals keep the old shell until closed.
+Place it near the top of the file, before your prompt theme and before any tool that wraps the shell. Prompt themes that rebuild the prompt on every command emit the editor's markers only when `VSCODE_SHELL_INTEGRATION` is set at the time they load; with this block at the bottom of `.zshrc`, the first command in each terminal is reported and every later one is dropped. Open a new terminal afterwards, existing terminals keep the old shell.
 
 **Names come from rules only.** The status-bar item "Terminame: rules" means no model provider was found. Install Claude Code and run `/login`, sign in to Copilot, or set an Anthropic key. A model call that exceeds `terminame.timeoutMs` also falls back to a rules name; three misses in a row disable that provider for the session.
 
