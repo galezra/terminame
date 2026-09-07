@@ -69,11 +69,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const inflight = new WeakMap<vscode.Terminal, AbortController>();
   const seenExecution = new WeakSet<vscode.Terminal>();
+  const starts = new WeakMap<vscode.Terminal, Promise<void>>();
   const hintTimers = new Map<vscode.Terminal, NodeJS.Timeout>();
 
   async function handleStart(terminal: vscode.Terminal, commandLine: string, cwdBasename?: string): Promise<void> {
     seenExecution.add(terminal);
     if (!config.enabled || renamer.isUserOwned(terminal)) return;
+    renamer.mark(terminal);
     const command = normalizeCommand(commandLine);
     if (isIgnored(command, config.ignore)) return;
 
@@ -96,13 +98,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     watchShell({
       onStart: (e) => {
         log.appendLine(`event: start "${e.commandLine}" (confidence ${e.confidence}) in "${e.terminal.name}"`);
-        guarded("handleStart", handleStart(e.terminal, e.commandLine, e.cwdBasename));
+        const started = handleStart(e.terminal, e.commandLine, e.cwdBasename);
+        starts.set(e.terminal, started);
+        guarded("handleStart", started);
       },
       onEnd: (e) => {
         log.appendLine(`event: end "${e.commandLine}" exit=${e.exitCode} in "${e.terminal.name}"`);
         if (!config.enabled) return;
         // An ignored command never renamed anything, so it must not trigger the idle name either.
         if (isIgnored(normalizeCommand(e.commandLine), config.ignore)) return;
+        if (e.exitCode === 127) {
+          // "command not found": a typo deserves neither a model call nor a name. Cancel the call and
+          // put the tab back how it was, once the start handler has finished whatever rename it began.
+          inflight.get(e.terminal)?.abort();
+          inflight.delete(e.terminal);
+          const started = starts.get(e.terminal) ?? Promise.resolve();
+          guarded("revert", started.catch(() => undefined).then(() => renamer.revert(e.terminal)));
+          return;
+        }
         if (!renamer.hasApplied(e.terminal)) return;
         if (config.idleName !== "keep") {
           // Drop any in-flight model call: a late answer must not overwrite the idle name.
